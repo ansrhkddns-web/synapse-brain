@@ -1,0 +1,574 @@
+/* 데스크 · 세션 카드 · 결과 탭 (Desk.jsx · SessionCard.jsx · Evidence.jsx)
+   색은 토큰만 쓴다. 상태 5색(--s-*)은 styles.css가 정한다 — 없을 때를 위해 fallback을 단다.
+   글자: 본문 14px/1.6 · 라벨 13px · 꼬리표 12px · 11px은 모노 숫자만. 모서리: 칩 6 · 카드 8 · 패널 10.
+   움직임 둘: 작업 중 점 숨쉬기 2.4s · 새 줄 반짝임 1.2s (prefers-reduced-motion이면 끔) */
+
+.desk, .sc, .ev {
+  --sc-work: var(--s-work, #3FB8AF); --sc-work-text: var(--s-work-text, #5FCFC6); --sc-work-bg: var(--s-work-bg, rgba(63,184,175,.13));
+  --sc-wait: var(--s-wait, #F2A93B); --sc-wait-text: var(--s-wait-text, #F5B85C); --sc-wait-bg: var(--s-wait-bg, rgba(242,169,59,.14));
+  --sc-done: var(--s-done, #8DBE6A); --sc-done-text: var(--s-done-text, #A3CF82); --sc-done-bg: var(--s-done-bg, rgba(141,190,106,.13));
+  --sc-err: var(--s-err, #E5484D); --sc-err-text: var(--s-err-text, #F07178); --sc-err-bg: var(--s-err-bg, rgba(229,72,77,.14));
+  --sc-off: var(--s-off, #6E675D);
+}
+
+/* ── 데스크 */
+.desk { max-width: 1240px; margin: 0 auto; padding: 28px 32px 140px; font-family: var(--f-ui); font-size: 14px; line-height: 1.6; color: var(--text); }
+.desk-head { display: flex; align-items: flex-end; gap: 24px; flex-wrap: wrap; padding-bottom: 20px; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+.desk-when { flex: 1; min-width: 220px; }
+.desk-crumb { font-size: 13px; color: var(--muted); }
+.desk-crumb b { color: var(--text); font-weight: 600; }
+.desk-date { margin: 2px 0 0; font-size: 20px; font-weight: 650; letter-spacing: -0.02em; color: var(--text); }
+.desk-date .mono { font-family: var(--f-mono); font-weight: 500; color: var(--text-2); margin-left: 6px; }
+.desk-sum { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+.desk-nums { display: flex; gap: 8px; flex-wrap: wrap; }
+.desk-num { min-width: 96px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); display: flex; flex-direction: column; gap: 2px; }
+.desk-num b { font: 600 28px/1.1 var(--f-mono); color: var(--text); letter-spacing: -0.02em; }
+.desk-num span { font-size: 13px; color: var(--muted); }
+.desk-num.s-wait { border-left: 2px solid var(--sc-wait); }
+.desk-num.s-wait b { color: var(--sc-wait-text); }
+.desk-num.s-done { border-left: 2px solid var(--sc-done); }
+.desk-num.s-done b { color: var(--sc-done-text); }
+.desk-num.s-work { border-left: 2px solid var(--sc-work); }
+.desk-num.s-work b { color: var(--sc-work-text); }
+
+.desk-units { display: flex; flex-wrap: wrap; gap: 6px; margin: -8px 0 24px; }
+
+.desk-grid { display: grid; grid-template-columns: minmax(0, 42fr) minmax(0, 58fr); gap: 24px; align-items: start; }
+.desk.one .desk-grid { grid-template-columns: minmax(0, 1fr); }
+.desk-col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.desk-sec { min-width: 0; }
+.desk-h { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.desk-h .mono { font: 500 11px var(--f-mono); color: var(--muted); }
+.desk-h .grow { flex: 1; }
+.desk-list { display: flex; flex-direction: column; gap: 8px; }
+.desk-empty { padding: 14px 16px; border: 1px dashed var(--line-2); border-radius: 8px; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.desk-fold { align-self: flex-start; height: 26px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
+.desk-fold:hover { color: var(--text-2); border-color: var(--line-2); }
+.desk-wait { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 13px; color: var(--text-2); }
+.desk-wait b { font-weight: 500; color: var(--text); }
+.desk-wait .mono { font-family: var(--f-mono); font-size: 12px; }
+
+.desk-flow { margin-top: 24px; }
+.desk-flowlist { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow: hidden; }
+.desk-flowlist li { display: grid; grid-template-columns: 44px 64px auto minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 7px 12px; border-top: 1px solid var(--line); font-size: 13px; }
+.desk-flowlist li:first-child { border-top: 0; }
+.desk-flowlist .mono { font: 500 11px var(--f-mono); color: var(--muted); }
+.desk-fk { font-size: 12px; color: var(--c, var(--text-2)); white-space: nowrap; }
+.desk-ft { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.desk.one .desk-flowlist li { grid-template-columns: 44px 56px minmax(0, 1fr); }
+.desk.one .desk-flowlist li > button { display: none; }
+
+/* ── 세션 카드 */
+.sc { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 12px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); font-family: var(--f-ui); font-size: 14px; line-height: 1.6; min-width: 0; transition: border-color 120ms; }
+.sc::before { content: ''; position: absolute; left: -1px; top: -1px; bottom: -1px; width: 2px; border-radius: 8px 0 0 8px; background: var(--sc-tone, var(--sc-off)); }
+.sc.clickable { cursor: pointer; }
+.sc.clickable:hover { border-color: var(--line-2); }
+.sc.clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sc.t-work { --sc-tone: var(--sc-work); --sc-tone-text: var(--sc-work-text); }
+.sc.t-wait { --sc-tone: var(--sc-wait); --sc-tone-text: var(--sc-wait-text); }
+.sc.t-done { --sc-tone: var(--sc-done); --sc-tone-text: var(--sc-done-text); }
+.sc.t-err { --sc-tone: var(--sc-err); --sc-tone-text: var(--sc-err-text); }
+.sc.t-off { --sc-tone: var(--sc-off); --sc-tone-text: var(--muted); }
+.sc.full { border: 0; padding: 0 0 0 12px; background: transparent; }
+.sc.full::before { left: 0; top: 2px; bottom: 2px; border-radius: 1px; }
+
+.sc-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sc-dot { flex: none; width: 6px; height: 6px; border-radius: 1.5px; background: var(--sc-tone, var(--sc-off)); }
+.sc.t-off .sc-dot { background: transparent; box-shadow: inset 0 0 0 1px var(--sc-off); }
+.sc-dot.breath { animation: sc-breath 2.4s ease-in-out infinite; }
+@keyframes sc-breath { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+.sc-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+.sc-title > span, .sc-tlink { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc.full .sc-title { font-size: 16px; }
+.sc.full .sc-title .etitle { font-size: 16px; font-weight: 650; }
+.sc-tlink { max-width: 100%; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.sc-tlink:hover { text-decoration: underline; text-underline-offset: 3px; }
+.sc-id { flex: none; font: 500 11px var(--f-mono); color: var(--muted); }
+.sc-new { flex: none; height: 20px; padding: 0 7px; border-radius: 6px; background: var(--sc-done-bg); color: var(--sc-done-text); font-size: 12px; line-height: 20px; }
+.sc-kind { flex: none; height: 20px; padding: 0 7px; border-radius: 6px; font-size: 12px; line-height: 20px; }
+.sc-kind.s-wait { background: var(--sc-wait-bg); color: var(--sc-wait-text); }
+.sc-kind.s-err { background: var(--sc-err-bg); color: var(--sc-err-text); }
+.sc-kind.s-done { background: var(--sc-done-bg); color: var(--sc-done-text); }
+
+.sc-sub { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--muted); min-width: 0; }
+.sc-sub .grow { flex: 1; }
+.sc-sub .mono { font: 500 11px var(--f-mono); }
+.sc-state { font-weight: 600; }
+.sc-state.s-work { color: var(--sc-work-text); }
+.sc-state.s-wait { color: var(--sc-wait-text); }
+.sc-state.s-done { color: var(--sc-done-text); }
+.sc-state.s-err { color: var(--sc-err-text); }
+.sc-state.s-off { color: var(--muted); }
+.sc-src { padding: 0 6px; border: 1px solid var(--line-2); border-radius: 6px; line-height: 18px; color: var(--muted); }
+.sc-quiet { color: var(--muted); }
+
+.sc-now, .sc-last, .sc-body { display: flex; gap: 8px; min-width: 0; font-size: 14px; color: var(--text-2); }
+.sc-body { display: block; }
+.sc-now > span:last-child, .sc-last > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.sc-last.clip > span:last-child { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.sc-k { flex: none; font-size: 12px; line-height: 22px; color: var(--muted); }
+.sc-now.warn > span:last-child { color: var(--sc-wait-text); }
+
+.sc-delivery { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px; border-radius: 6px; background: var(--surface-2); font-size: 13px; }
+.sc-dhead { font-size: 12px; color: var(--muted); }
+.sc-dline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; color: var(--text-2); }
+.sc-dtext { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.sc-dstate { color: var(--muted); }
+.sc-dline.inc .sc-dstate { color: var(--sc-work-text); }
+.sc-dline.ok .sc-dstate { color: var(--sc-done-text); }
+
+.sc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.sc-chip { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line-2); background: var(--surface-2); color: var(--text-2); font: 500 13px var(--f-ui); cursor: pointer; transition: border-color 120ms, color 120ms; }
+.sc-chip:hover:not(:disabled) { border-color: var(--line-3, var(--line-2)); color: var(--text); }
+.sc-chip:disabled { opacity: .55; cursor: default; }
+.sc-chip.primary { background: var(--primary-bg); color: var(--primary-ink); border-color: transparent; font-weight: 600; }
+.sc-chip.stop:hover:not(:disabled) { color: var(--sc-err-text); border-color: var(--sc-err); }
+.sc-chip.on { border-color: var(--accent); color: var(--text); }
+.sc-chip .mono { font: 500 11px var(--f-mono); color: var(--muted); }
+
+.sc-again { display: flex; gap: 6px; }
+.sc-again input { flex: 1; min-width: 0; height: 30px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line-2); background: var(--surface); color: var(--text); font: 13px var(--f-ui); outline: none; }
+.sc-again input:focus { border-color: var(--accent); }
+
+.sc-reply { font-size: 13px; color: var(--text-2); }
+.sc-reply.err { color: var(--sc-err-text); }
+.sc-foot { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.sc-foot .grow { flex: 1; }
+.sc-note { font-size: 12px; color: var(--muted); }
+.sc-tok { font: 500 11px var(--f-mono); color: var(--muted); }
+.sc-link { padding: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--accent-text, var(--accent)); cursor: pointer; }
+.sc-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.sc-link:disabled { opacity: .5; cursor: default; }
+.sc-link.mono { font: 500 11px var(--f-mono); }
+.sc-copy { height: 22px; padding: 0 7px; border-radius: 6px; border: 1px solid var(--line-2); background: var(--surface-2); color: var(--text-2); font-size: 12px; cursor: pointer; }
+.sc-copy:hover { color: var(--text); }
+
+/* 패널 머리 · 입력창 */
+.insp-head.sc-head { display: flex; flex-direction: column; gap: 4px; flex: none; max-height: 46%; overflow-y: auto; }   /* 긴 마지막 답이 패널을 밀어내지 않게 — 넘치면 머리 안에서 스크롤 */
+.sc-replybox { border-top: 1px solid var(--line); }
+.sc-replybox .insp-reply { border-top: 0; padding-top: 4px; }
+.sc-target { padding: 8px 14px 0; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-target .mono { font: 500 11px var(--f-mono); color: var(--text-2); }
+.sc-replybox .sc-reply { padding: 2px 14px 0; }
+.sc-cursor { display: inline-block; width: 7px; height: 14px; margin-top: 6px; background: var(--sc-work, var(--accent)); animation: sc-blink 1.2s steps(2, start) infinite; }
+@keyframes sc-blink { to { visibility: hidden; } }
+
+/* 새 줄 반짝임 */
+.flash { animation: sc-flash 1.2s ease-out; }
+@keyframes sc-flash { from { background: var(--acc-bg); } to { background: transparent; } }
+
+/* ── 결과 탭 */
+.ev { display: flex; flex-direction: column; gap: 18px; font-size: 14px; line-height: 1.6; }
+.ev-partial { padding: 6px 10px; border-radius: 6px; background: var(--surface-2); font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.ev-sec { min-width: 0; }
+.ev-h { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.ev-h .mono { font: 500 11px var(--f-mono); color: var(--muted); margin-left: 4px; }
+.ev-answer { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.ev-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ev-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 6px 10px; border-radius: 6px; background: var(--surface-2); min-width: 0; }
+.ev-list a { color: var(--accent-text, var(--accent)); font-weight: 500; overflow-wrap: anywhere; }
+.ev-path { color: var(--text); font-weight: 500; }
+.ev-meta { font: 500 11px var(--f-mono); color: var(--muted); }
+.ev-url { flex: 1 1 100%; min-width: 0; font: 500 11px var(--f-mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev-list li .sc-copy { margin-left: auto; }
+.ev-stats { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
+.ev-stats .bad { color: var(--sc-err-text); }
+.ev-verdict { padding-top: 12px; border-top: 1px solid var(--line); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-dot.breath, .flash, .sc-cursor { animation: none; }
+  .sc, .sc-chip { transition: none; }
+}
+
+/* ── 시냅스 연출 — 빛·흐름·맥동 (AI 룩의 상투어가 아니라 "신호가 흐르는 두뇌"라는 이 제품의 성격) ──
+   작업 중 카드: 테두리를 도는 빛 호 + 위를 훑는 신호선 + 모서리 빛 번짐
+   기다림·오류: 왼쪽 빛 띠가 맥동 / 답 왔음: 연두 번짐과 반짝이는 새 답 꼬리표
+   데스크 머리: 살아 있는 시냅스 캔버스(SynapseField) 위에 빛나는 숫자 */
+
+.desk-head > :not(.syn-field) { position: relative; z-index: 1; }
+.syn-field { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+.desk-date { text-shadow: 0 0 24px rgba(124, 140, 255, .35); }
+
+@keyframes syn-warn { 50% { box-shadow: 0 0 0 1px rgba(255, 200, 92, .45), 0 10px 34px -8px rgba(255, 200, 92, .75); } }
+
+
+/* 세션 카드 */
+.sc { overflow: hidden; transition: transform 200ms var(--ease), border-color 200ms, box-shadow 200ms; }
+.sc.clickable:hover { transform: translateY(-1px); box-shadow: 0 12px 30px -16px color-mix(in srgb, var(--sc-tone, var(--g1)) 60%, transparent); }
+.sc:not(.full) { background: radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--sc-tone, var(--g1)) 13%, transparent), transparent 60%), var(--surface); }
+.sc:not(.full)::before { box-shadow: 0 0 12px var(--sc-tone, transparent); }
+.sc.t-work:not(.full) { border-color: color-mix(in srgb, var(--s-work) 30%, var(--line-2)); }
+.sc.t-work:not(.full)::after { content: ""; position: absolute; inset: -1px; padding: 1.5px; border-radius: inherit; pointer-events: none;
+  background: conic-gradient(from var(--mp-a), transparent 0 58%, color-mix(in oklch, var(--s-work) 30%, transparent) 76%, var(--s-work) 90%, transparent 91%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: mpOrbit 2.6s linear infinite; }
+.sc.t-work .sc-top::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: var(--grad); animation: scan 2.6s var(--ease-io) infinite; }
+.sc.t-wait:not(.full)::before, .sc.t-err:not(.full)::before { animation: syn-bar 1.8s ease-in-out infinite; }
+@keyframes syn-bar { 50% { box-shadow: 0 0 20px var(--sc-tone); opacity: .7; } }
+.sc.t-done .sc-new { box-shadow: 0 0 12px rgba(184, 255, 92, .45); animation: syn-shine 2.4s ease-in-out infinite; }
+@keyframes syn-shine { 50% { box-shadow: 0 0 20px rgba(184, 255, 92, .75); } }
+
+.sc-dot { border-radius: 50%; box-shadow: 0 0 8px var(--sc-tone, transparent); }
+.sc-dot.breath { --c: var(--sc-tone, var(--s-work)); animation: livedot 1.6s var(--ease) infinite; }
+.sc-now { position: relative; }
+.sc-now.flash::after { content: ""; position: absolute; inset: 0; border-radius: 6px; pointer-events: none; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--s-work) 22%, transparent), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: syn-sweep 1.2s var(--ease) 1; }
+@keyframes syn-sweep { from { background-position: -60% 0; } to { background-position: 160% 0; } }
+
+.sc-chip { transition: border-color 150ms, box-shadow 150ms, transform 150ms, color 150ms; }
+.sc-chip:hover { border-color: var(--acc-line); box-shadow: 0 0 14px -2px var(--acc-line); transform: translateY(-1px); }
+.sc-chip.primary { background: var(--grad-d); color: #0A0B10; border-color: transparent; box-shadow: 0 6px 18px -8px rgba(79, 227, 255, .7); }
+.sc-chip.stop:hover { border-color: var(--s-err); box-shadow: 0 0 14px -2px var(--s-err); }
+
+/* 보낸 지시: 실린 것(포함)은 빛이 흐르는 줄, 전달 확인은 연두로 한 번 빛남 */
+.sc-dline.inc { position: relative; }
+.sc-dline.inc::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent 0 35%, var(--s-work) 50%, transparent 65%) 0 0 / 260% 100%; animation: mpFlow 1.4s linear infinite; }
+.sc-dline.ok { text-shadow: 0 0 10px rgba(184, 255, 92, .55); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sc.t-work:not(.full)::after, .sc.t-work .sc-top::before, .desk-num.s-wait, .sc.t-wait:not(.full)::before, .sc.t-err:not(.full)::before,
+  .sc.t-done .sc-new, .sc-dot.breath, .sc-now.flash::after, .sc-dline.inc::after { animation: none; }
+}
+
+/* 시냅스 캔버스는 데스크 전체 바탕 — 위의 내용은 반투명 유리 위에 */
+.desk { position: relative; isolation: isolate; }
+.desk-sec, .desk-flow { position: relative; }
+.desk-flow, .desk-list .sc:not(.full) { backdrop-filter: blur(3px); }
+
+/* 일하는 중 신호 막대 (도는 세션의 "심장 박동") */
+.sc-eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; margin-left: auto; padding-left: 8px; }
+.sc-eq i { width: 2px; height: 100%; border-radius: 1px; background: var(--s-work); box-shadow: 0 0 6px var(--s-work); transform-origin: bottom; animation: syn-eq 900ms ease-in-out infinite; }
+.sc-eq i:nth-child(2) { animation-delay: -300ms; animation-duration: 700ms; }
+.sc-eq i:nth-child(3) { animation-delay: -150ms; animation-duration: 1100ms; }
+.sc-eq i:nth-child(4) { animation-delay: -500ms; animation-duration: 800ms; }
+.sc-eq i:nth-child(5) { animation-delay: -700ms; animation-duration: 1000ms; }
+@keyframes syn-eq { 0%, 100% { transform: scaleY(.25); } 50% { transform: scaleY(1); } }
+.sc-now { display: flex; align-items: center; gap: 8px; }
+
+/* 숫자가 바뀌는 순간 한 번 빛남 */
+.desk-num b.roll { animation: syn-pop 700ms var(--ease) 1; }
+@keyframes syn-pop { 0% { filter: brightness(2.2); transform: translateY(-3px); } 100% { filter: none; transform: none; } }
+
+/* 새로 들어온 줄·카드는 아래에서 떠오르며 빛난다 */
+.desk-list > *, .desk-flowlist > * { animation: syn-in 420ms var(--ease) both; }
+@keyframes syn-in { from { opacity: 0; transform: translateY(6px); filter: brightness(1.6); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-eq i, .desk-num b.roll, .desk-list > *, .desk-flowlist > * { animation: none; }
+}
+
+/* 캔버스는 보이는 화면에 고정(스크롤해도 늘 뒤에서 돈다) — 내용은 그 위를 지나간다 */
+.sc:not(.full) { background: radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--sc-tone, var(--g1)) 13%, transparent), transparent 60%), color-mix(in srgb, var(--surface) 78%, transparent); }
+.desk-empty, .desk-flow { background: color-mix(in srgb, var(--surface) 70%, transparent); }
+/* 글씨가 흐려지지 않게 카드 바탕은 조금 더 진하게 (망은 카드 사이·가장자리로 비친다) */
+.sc:not(.full) { background: radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--sc-tone, var(--g1)) 14%, transparent), transparent 60%), color-mix(in srgb, var(--surface) 90%, transparent); }
+
+/* ══ 모든 화면 연출 ══════════════════════════════════════════════
+   배경: 앱 스크롤 틀(.scroll) 첫 자식으로 시냅스 망이 늘 돈다 (지도·기억은 자기 캔버스가 있어 빼고) */
+.scroll { position: relative; isolation: isolate; }
+
+
+/* 보드: 열 머리 빛 막대, 카드가 떠오르며 등장, 올리면 빛 테두리 */
+.col { position: relative; background: color-mix(in srgb, var(--surface) 82%, transparent); backdrop-filter: blur(4px); transition: border-color 200ms, box-shadow 200ms; }
+.col:hover { border-color: var(--line-3); box-shadow: 0 16px 40px -24px var(--c, var(--g1)); }
+@keyframes syn-bar2 { 50% { width: 22px; box-shadow: 0 0 16px var(--c); } }
+.col .cards > * { animation: syn-in 420ms var(--ease) both; }
+.col .cards > *:nth-child(2) { animation-delay: 60ms; } .col .cards > *:nth-child(3) { animation-delay: 120ms; } .col .cards > *:nth-child(4) { animation-delay: 180ms; }
+.col .card { transition: transform 200ms var(--ease), border-color 200ms, box-shadow 200ms; }
+.col .card:hover { box-shadow: 0 10px 28px -14px var(--acc-line), inset 0 0 0 1px var(--acc-line); }
+.col .card.live { box-shadow: 0 0 0 1px var(--acc-line), 0 10px 30px -14px rgba(79, 227, 255, .5); }
+
+/* 기록: 줄이 차례로 떠오르고, 종류 점은 빛나고, 도는 막대는 신호가 흐른다 */
+.tl-row { animation: syn-in 380ms var(--ease) both; transition: background 160ms; }
+.tl-row:hover { background: color-mix(in srgb, var(--acc-bg) 60%, transparent); }
+.tlb-span.live { background: linear-gradient(90deg, color-mix(in oklch, var(--c) 35%, transparent) 0 35%, var(--c) 50%, color-mix(in oklch, var(--c) 35%, transparent) 65%) 0 0 / 260% 100%; box-shadow: 0 0 10px var(--c); animation: mpFlow 1.4s linear infinite; }
+.tlb-ev { box-shadow: 0 0 8px var(--c); }
+
+@keyframes syn-shine2 { 50% { filter: brightness(1.35); box-shadow: 0 0 16px 0 currentColor; } }
+
+/* 패널: 탭 밑줄이 그라데이션으로 미끄러지고, 지금 구역은 빛 테두리 */
+.run.live .bubble { position: relative; box-shadow: 0 0 0 1px color-mix(in srgb, var(--s-work) 35%, transparent), 0 10px 34px -16px rgba(79, 227, 255, .55); }
+.run.live .run-head span { color: var(--s-work-text); text-shadow: 0 0 10px var(--s-work); }
+.run.live .run-head::after { background: linear-gradient(90deg, var(--s-work), transparent); }
+.toolline .tag { animation: syn-in 300ms var(--ease) both; }
+
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar::after, .cmdbar::before, .col-head .bar, .col .cards > *, .tl-row, .tlb-span.live, .wbadge.acc, .wbadge.warn, .toolline .tag { animation: none; }
+}
+
+
+/* 보드·지도의 작업 중 카드: 테두리를 도는 빛 호 + 은은한 숨 (데스크 카드와 같은 문법) */
+.col .card.live:not(.decide)::before { content: ""; position: absolute; inset: -1px; padding: 1.5px; border-radius: inherit; pointer-events: none;
+  background: conic-gradient(from var(--mp-a), transparent 0 58%, color-mix(in oklch, var(--g2) 30%, transparent) 76%, var(--g2) 90%, transparent 91%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: mpOrbit 2.6s linear infinite; }
+.col .card.live { animation: syn-card-breath 2.8s ease-in-out infinite; }
+@keyframes syn-card-breath { 50% { box-shadow: 0 0 0 1px var(--acc-line), 0 14px 38px -12px rgba(79, 227, 255, .75); } }
+.m-card.live { box-shadow: 0 0 0 1px color-mix(in srgb, var(--g2) 45%, transparent), 0 10px 30px -12px rgba(79, 227, 255, .6); animation: syn-card-breath 2.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .col .card.live, .col .card.live::before, .m-card.live { animation: none; } }
+
+/* 지도의 바깥 세션 카드(작업 중): 테두리를 도는 빛 호 · 위를 훑는 신호선 · 숨 쉬는 빛 · 뛰는 신호 막대 */
+.m-pcs.on { overflow: visible; animation: syn-pcs-breath 2.6s ease-in-out infinite; }
+.m-pcs.on::before { content: ""; position: absolute; inset: -1px; padding: 1.5px; border-radius: inherit; pointer-events: none;
+  background: conic-gradient(from var(--mp-a), transparent 0 58%, color-mix(in oklch, var(--g2) 30%, transparent) 76%, var(--g2) 90%, transparent 91%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: mpOrbit 2.4s linear infinite; }
+.m-pcs.on .mx-top { position: relative; }
+.m-pcs.on .mx-title { text-shadow: 0 0 14px color-mix(in srgb, var(--g2) 45%, transparent); }
+.m-pcs.on::after { box-shadow: 0 0 12px var(--c); animation: syn-bar 1.8s ease-in-out infinite; }
+.m-pcs .mx-now { display: flex; align-items: center; gap: 6px; }
+@keyframes syn-pcs-breath { 50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--g2) 40%, transparent), 0 12px 34px -12px rgba(79, 227, 255, .7); } }
+/* 지도 작업 카드도 일하는 중이면 테두리 빛이 돈다 */
+.m-card.live::before { content: ""; position: absolute; inset: -1px; padding: 1.5px; border-radius: inherit; pointer-events: none;
+  background: conic-gradient(from var(--mp-a), transparent 0 58%, color-mix(in oklch, var(--g2) 30%, transparent) 76%, var(--g2) 90%, transparent 91%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: mpOrbit 2.4s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .m-pcs.on, .m-pcs.on::before, .m-pcs.on::after, .m-card.live::before { animation: none; } }
+
+/* 시냅스 망: 앱 가운데 영역 전체 뒤에 하나 (탭이 바뀌어도 그대로). 내용은 그 위에 */
+.main > .syn-field { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; opacity: .75; transition: opacity 400ms var(--ease); }
+.main > .syn-field.off { opacity: 0; }
+.main > .scroll, .main > .tabbar { position: relative; z-index: 1; }
+.main > div:not(.cmdbar-wrap):not(.scroll) { position: relative; z-index: 1; }
+
+/* ══ 작동 중의 빛 ══════════════════════════════════════════════
+   바탕·메뉴는 먹색 그대로, "지금 일하는 것"에만 빛 색(시안·인디고)을 쓴다 — 예전 시냅스의 빛나는 연출 */
+:root { --sig: #5FE6FF; --sig-2: #8C9BFF; --sig-glow: rgba(95, 230, 255, .55); }
+[data-theme="light"] { --sig: #0098C2; --sig-2: #4B57F5; --sig-glow: rgba(0, 152, 194, .35); }
+
+/* 지도: 도는 길은 빛나는 줄, 그 위를 흐르는 점은 흰 심에 시안 번짐 */
+.me.live { stroke: var(--sig); opacity: .9; filter: drop-shadow(0 0 calc(3px / var(--k)) var(--sig-glow)); }
+.me-link.live { stroke: var(--sig-2); }
+.syn-dot { fill: #fff; filter: drop-shadow(0 0 calc(3px / var(--k)) var(--sig)) drop-shadow(0 0 calc(9px / var(--k)) var(--sig-glow)); }
+.syn-link .syn-dot { fill: #fff; }
+.m-dept.live, .m-unit.live { border-color: color-mix(in srgb, var(--sig) 60%, var(--line-2)); box-shadow: 0 0 16px -4px var(--sig-glow); }
+.m-knob.live { color: var(--sig); border-color: color-mix(in srgb, var(--sig) 50%, var(--line-2)); box-shadow: 0 0 10px -2px var(--sig-glow); }
+
+/* 작동 중인 카드 (지도 작업·바깥 세션·프로그램·공정, 보드, 데스크): 빛 테두리 · 모서리 번짐 · 숨 쉬는 글로우 · 도는 빛 호 */
+.m-card.live, .m-prog.live, .m-pcs.on, .m-proc.live, .col .card.live, .sc.t-work:not(.full) {
+  --g2: var(--sig);
+  border-color: color-mix(in srgb, var(--sig) 55%, var(--line-2));
+  background: radial-gradient(130% 110% at 0% 0%, color-mix(in srgb, var(--sig) 14%, transparent), transparent 60%), var(--surface);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sig) 28%, transparent), 0 0 22px -6px var(--sig-glow);
+  animation: syn-glow 2.4s ease-in-out infinite;
+}
+@keyframes syn-glow {
+  50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--sig) 60%, transparent), 0 0 34px 0 var(--sig-glow), inset 0 0 18px -10px var(--sig); }
+}
+.m-prog.live::before, .m-proc.live::before { content: ""; position: absolute; inset: -1px; padding: 1.5px; border-radius: inherit; pointer-events: none;
+  background: conic-gradient(from var(--mp-a), transparent 0 58%, color-mix(in oklch, var(--sig) 30%, transparent) 76%, var(--sig) 90%, transparent 91%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: mpOrbit 2.4s linear infinite; }
+.m-prog.live > i { background: var(--sig); box-shadow: 0 0 10px var(--sig); border-radius: 50%; }
+.m-card.live .mc-title, .m-pcs.on .mx-title, .col .card.live .card-title, .sc.t-work .sc-title { text-shadow: 0 0 14px var(--sig-glow); }
+.m-pcs.on::after, .m-card.live::after { background: var(--sig); box-shadow: 0 0 12px var(--sig); }
+.sc-eq i { background: var(--sig); box-shadow: 0 0 6px var(--sig); }
+.mx-st.on { color: var(--sig); background: color-mix(in srgb, var(--sig) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sig) 45%, transparent); }
+.mx-st.on i { background: var(--sig); box-shadow: 0 0 8px var(--sig); }
+@media (prefers-reduced-motion: reduce) {
+  .m-card.live, .m-prog.live, .m-pcs.on, .m-proc.live, .col .card.live, .sc.t-work:not(.full), .m-prog.live::before, .m-proc.live::before { animation: none; }
+}
+
+/* 카드를 휘감아 도는 빛 (예전 공정 카드 "가동 중"과 같은 연출, 더 굵고 길게):
+   테두리를 따라 긴 빛 꼬리가 돌고, 머리는 밝게 번진다. 작동 중인 모든 카드에 같은 모양 */
+.m-card.live::before, .m-pcs.on::before, .m-prog.live::before, .m-proc.live::before, .col .card.live:not(.decide)::before, .sc.t-work:not(.full)::after {
+  content: ""; position: absolute; inset: -1px; padding: 2px; border-radius: inherit; pointer-events: none; z-index: 2;
+  background: conic-gradient(from var(--mp-a),
+    transparent 0 42%,
+    color-mix(in oklch, var(--sig) 12%, transparent) 58%,
+    color-mix(in oklch, var(--sig) 45%, transparent) 76%,
+    var(--sig) 92%, #ffffff 95%, transparent 96%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  filter: drop-shadow(0 0 4px var(--sig)) drop-shadow(0 0 10px var(--sig-glow));
+  animation: mpOrbit 2.6s linear infinite;
+}
+.m-proc.live { --sig: var(--ok); --sig-glow: color-mix(in srgb, var(--ok) 55%, transparent); }   /* 공정은 예전처럼 초록 */
+@media (prefers-reduced-motion: reduce) {
+  .m-card.live::before, .m-pcs.on::before, .m-prog.live::before, .m-proc.live::before, .col .card.live::before, .sc.t-work:not(.full)::after { animation: none; }
+}
+
+/* 지도에서 왼쪽 가지 카드는 빛 호가 반시계로 (MapView가 --dir을 넘긴다) */
+.m-card.live::before, .m-pcs.on::before, .m-prog.live::before, .m-proc.live::before { animation-direction: var(--dir, normal); }
+
+/* ══ 지도 작업용 ══════════════════════════════════════════════
+   지도를 보면서 일하는 화면: 보기 렌즈(지금·오늘·전체) · 배율별 표시 · 내 차례 맥동 · 화면 밖 할 일 표식 · 자료 더미 · 잡음 정리.
+   도구 막대·표식은 먹색 그대로(빛 없음). 빛은 위의 "작업 중" 빛 호만, 내 차례는 상태색으로 은은하게 맥동(빛 호와 겹치지 않게). */
+
+/* 보기 렌즈 */
+.map-lens { display: inline-flex; gap: 2px; margin-left: 2px; padding: 2px; border-radius: 6px; border: 1px solid var(--line-2); background: var(--surface); }
+.map-lens button { height: 24px; padding: 0 10px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font: 500 12px var(--f-ui); cursor: pointer; }
+.map-lens button:hover { color: var(--text-2); }
+.map-lens button.on { background: var(--surface-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-3, var(--line-2)); }
+
+/* 지금 보기: 도는 것·내 차례 가지 밖은 흐리게 (누를 수는 있다) */
+.mapview .m-dim { opacity: .25; transition: opacity 200ms; }
+.mapview .m-dim:hover { opacity: .75; }
+.map-edges .me.m-dim { opacity: .14; }
+
+/* 할 일 표식을 눌러 카메라가 옮겨 갈 때만 부드럽게 */
+.map-world.glide { transition: transform 450ms var(--ease, ease); }
+
+/* 상태 점 — 가까이에선 숨기고(꼬리표가 있으니) 멀리에서만 */
+.m-card .mc-st { display: none; }
+
+/* 멀리(배율 < 0.85): 카드 = 상태 점 + 큰 제목 한 줄. 글자는 --k로 보정해 화면에서 13px 이상 */
+.mapview.map-compact .m-card { justify-content: center; gap: 4px; padding: 0 14px 0 16px; }
+.mapview.map-compact .m-card > :not(.mc-title):not(.mc-res) { display: none; }
+.mapview.map-compact .m-card .mc-title { display: flex; align-items: center; gap: clamp(6px, calc(8px / var(--k)), 20px); font-size: clamp(13px, calc(11px / var(--k)), 26px); text-overflow: ellipsis; line-height: 1.25; font-weight: 600; color: var(--text); -webkit-line-clamp: unset; white-space: nowrap; overflow: hidden; }
+.mapview.map-compact .m-card .mc-title::before { display: none; }
+.mapview.map-compact .m-card .mc-title > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mapview.map-compact .m-card.child .mc-title { font-size: clamp(12px, calc(12px / var(--k)), 32px); }
+.mapview.map-compact .m-card .mc-st { display: block; flex: none; width: clamp(8px, calc(9px / var(--k)), 24px); height: clamp(8px, calc(9px / var(--k)), 24px); border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 clamp(1.5px, calc(2px / var(--k)), 5px) var(--muted); }
+.mapview.map-compact .m-card.live .mc-st { background: var(--sig); box-shadow: none; }
+.mapview.map-compact .m-card.decide .mc-st { background: var(--s-wait); box-shadow: none; }
+.mapview.map-compact .m-card.done .mc-st { background: color-mix(in srgb, var(--s-done) 70%, transparent); box-shadow: none; }
+/* 아주 멀리(lod-far)는 예전에 카드 상자를 지웠다 — 작업 카드는 상자를 되살려 상태 띠가 보이게 */
+.mapview.lod-far .m-card { padding: 0 14px 0 16px; border: 1px solid var(--line-2); background: var(--surface); }
+.mapview.lod-far .m-card.child { border-style: dashed; }
+.mapview.lod-far .m-card.decide { border-color: var(--warn-line); }
+.mapview.lod-far .m-card.sel { border-color: var(--acc-line); }
+.mapview.lod-far .m-card.live { border-color: color-mix(in srgb, var(--sig) 55%, var(--line-2)); background: radial-gradient(130% 110% at 0% 0%, color-mix(in srgb, var(--sig) 14%, transparent), transparent 60%), var(--surface); }
+/* 바깥 세션 카드도 멀리선 제목만 크게 */
+.mapview.map-compact .m-pcs .mx-now { display: none; }
+.mapview.map-compact .m-pcs .mx-title { display: block; font-size: clamp(13px, calc(13px / var(--k)), 34px); line-height: 1.3; -webkit-line-clamp: unset; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 오늘 보기: 끝난 카드에 결과 한 줄 */
+.m-card.done.res { opacity: .9; }
+.m-card.done.res .mc-title { color: var(--text-2); }
+.mc-res { font-size: 12px; line-height: 1.45; color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.mc-res .mono { margin-right: 6px; font: 500 .9em var(--f-mono); color: var(--s-done-text); }
+.mapview.map-compact .mc-res { font-size: clamp(12px, calc(12px / var(--k)), 30px); line-height: 1.3; -webkit-line-clamp: 1; }
+
+/* 내 차례: 왼쪽 띠와 테두리가 상태색으로 은은하게 맥동 (새 답 = 연두, 기다림 = 호박). 작업 중 카드엔 안 붙는다(빛 호가 있으니) */
+.m-card.turn, .m-pcs.turn { --turn: var(--s-wait); }
+.m-card.turn-answer, .m-pcs.turn-answer { --turn: var(--s-done); }
+.mapview .m-card.turn, .mapview .m-pcs.turn { border-color: color-mix(in srgb, var(--turn) 65%, var(--line-2)); animation: mapTurn 2.6s ease-in-out infinite; }
+.m-card.turn::after { content: ''; position: absolute; left: -1px; top: -1px; bottom: -1px; width: 3px; border-radius: 8px 0 0 8px; background: var(--turn); animation: mapTurnBand 2.6s ease-in-out infinite; }
+.m-pcs.turn::after { background: var(--turn); opacity: 1; animation: mapTurnBand 2.6s ease-in-out infinite; }
+.mapview.map-compact .m-card.turn .mc-st { background: var(--turn); box-shadow: none; }
+@keyframes mapTurn { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { border-color: var(--turn); box-shadow: 0 0 0 1px color-mix(in srgb, var(--turn) 40%, transparent); } }
+@keyframes mapTurnBand { 50% { opacity: .4; } }
+.m-knob.turn { color: var(--s-wait-text); border-color: color-mix(in srgb, var(--s-wait) 55%, var(--line-2)); }
+
+/* 화면 밖 내 차례 표식 ("할 일 2 →") */
+.map-turn-edge { position: absolute; z-index: 5; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line-2); background: var(--bg); font: 600 12px var(--f-ui); white-space: nowrap; cursor: pointer; }
+.map-turn-edge span { font-family: var(--f-mono); }
+.map-turn-edge.wait { color: var(--s-wait-text); border-color: color-mix(in srgb, var(--s-wait) 55%, var(--line-2)); }
+.map-turn-edge.answer { color: var(--s-done-text); border-color: color-mix(in srgb, var(--s-done) 55%, var(--line-2)); }
+.map-turn-edge:hover { background: var(--surface); }
+.map-turn-edge.left { left: 10px; transform: translateY(-50%); }
+.map-turn-edge.right { right: 10px; transform: translateY(-50%); }
+.map-turn-edge.top { top: 60px; transform: translateX(-50%); }
+.map-turn-edge.bottom { bottom: 116px; transform: translateX(-50%); }
+
+/* 기억 층: 하위 항목·부서 칩 오른쪽 끝의 종이 더미 표식 */
+.m-unit.has-pile { padding-right: 46px; }
+.m-dept.has-pile { padding-right: 48px; }
+.m-pile { position: absolute; z-index: 3; display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 6px 0 5px; border-radius: 5px; border: 1px solid var(--line-2); background: var(--surface-2); color: var(--muted); cursor: pointer; }
+.m-pile i { position: relative; flex: none; width: 8px; height: 10px; margin-top: 2px; }
+.m-pile i::before, .m-pile i::after { content: ''; position: absolute; inset: 0; border: 1px solid currentColor; border-radius: 1.5px; background: var(--surface-2); }
+.m-pile i::before { transform: translate(2.5px, -2.5px); opacity: .55; }
+.m-pile .mono { font: 500 11px var(--f-mono); }
+.m-pile:hover, .m-pile.on { color: var(--text); border-color: var(--line-3, var(--line-2)); }
+.lod-mid .m-pile.dept { transform: scale(1.25); }
+.lod-far .m-pile.dept { transform: scale(1.9); }
+.lod-far .m-pile.unit { transform: scale(1.6); }
+
+.m-pile-pop { position: absolute; z-index: 20; width: 290px; max-height: 340px; display: flex; flex-direction: column; border-radius: 8px; border: 1px solid var(--line-2); background: var(--bg); box-shadow: 0 12px 32px -14px rgba(0, 0, 0, .6); cursor: default; font: 13px/1.5 var(--f-ui); color: var(--text-2); }
+.mpp-head { display: flex; align-items: center; gap: 6px; padding: 8px 8px 0 12px; }
+.mpp-head b { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mpp-head .grow { flex: 1; }
+.mpp-x { width: 22px; height: 22px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 15px; line-height: 1; cursor: pointer; }
+.mpp-x:hover { background: var(--surface-2); color: var(--text); }
+.mpp-sum { padding: 0 12px 6px; font-size: 11px; color: var(--muted); }
+.m-pile-pop ul { list-style: none; margin: 0; padding: 4px; overflow-y: auto; border-top: 1px solid var(--line); }
+.m-pile-pop li button { width: 100%; display: flex; align-items: center; gap: 8px; padding: 5px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text-2); font: 13px var(--f-ui); text-align: left; cursor: pointer; }
+.m-pile-pop li button:hover { background: var(--surface-2); color: var(--text); }
+.m-pile-pop li span:not(.mono) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-pile-pop li .mono { flex: none; font: 500 11px var(--f-mono); color: var(--faint); }
+.mpp-k { flex: none; padding: 0 5px; border-radius: 4px; background: var(--surface-2); color: var(--muted); font-size: 11px; font-style: normal; }
+.mpp-k.rep { color: var(--s-work-text); }
+.mpp-k.card { color: var(--s-done-text); }
+.mpp-doc { margin: 4px; height: 28px; border-radius: 6px; border: 1px solid var(--line-2); background: var(--surface); color: var(--text-2); font: 500 12px var(--f-ui); cursor: pointer; }
+.mpp-doc:hover { color: var(--text); border-color: var(--line-3, var(--line-2)); }
+
+/* 잡음 정리: 작업 중 아닌 프로그램은 작게, PC 사용량은 기본 한 줄로 접힘 */
+.m-prog.idle { padding: 0 8px; gap: 6px; font-size: 11px; opacity: .75; }
+.m-prog.idle b { font-size: 10.5px; }
+.m-prog.idle .ug-share { font-size: 10.5px; }
+.m-usage-mini { position: absolute; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 12px; border-radius: 6px; border: 1px solid var(--line-2); background: var(--surface); color: var(--text-2); font-size: 12px; white-space: nowrap; cursor: pointer; }
+.m-usage-mini .grow { flex: 1; }
+.m-usage-mini .mono { font: 500 11px var(--f-mono); color: var(--muted); }
+.m-usage-mini em { font: 500 12px var(--f-mono); font-style: normal; color: var(--faint); }
+.m-usage-mini:hover { border-color: var(--c); color: var(--text); }
+.m-usage-mini.hot { border-color: var(--warn-line); }
+.m-usage-mini.hot .mono { color: var(--s-wait-text); }
+.lod-far .m-usage-mini { transform: scale(1.6); }
+.m-gauge-fold { position: absolute; z-index: 3; width: 22px; height: 22px; border-radius: 5px; border: 1px solid var(--line-2); background: var(--surface-2); color: var(--muted); font: 500 13px var(--f-mono); line-height: 1; cursor: pointer; }
+.m-gauge-fold:hover { color: var(--text); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mapview .m-card.turn, .mapview .m-pcs.turn, .m-card.turn::after, .m-pcs.turn::after { animation: none; }
+  .map-world.glide, .mapview .m-dim { transition: none; }
+}
+
+/* 멀리 볼 때 부서·하위 칩: 크기는 그대로(키우면 옆과 겹친다), 글자만 또렷하게 */
+.mapview.map-compact .m-dept { font-weight: 650; }
+.mapview.map-compact .m-unit { color: var(--text); }
+
+/* ── 일정비서 (비서실 / 일정비서 아래): 섹션 카드 → 일정 카드. 체크 = 완료로 지우기 */
+.m-tsec { position: absolute; display: flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 6px; border: 1px solid var(--line-2); background: var(--bg); color: var(--text); font-size: 12.5px; white-space: nowrap; overflow: hidden; cursor: pointer; }
+.m-tsec i { flex: none; width: 7px; height: 7px; border-radius: 2px; background: var(--s-wait); }
+.m-tsec .mono { font-size: 11px; color: var(--muted); }
+.m-tsec.k-overdue i { background: var(--danger); }
+.m-tsec.k-overdue { border-color: color-mix(in srgb, var(--danger) 45%, var(--line-2)); }
+.m-tsec.k-missed i { background: #8C9BFF; }
+.m-tsec.k-week i, .m-tsec.k-sched i { background: var(--muted); }
+.m-tsec.k-done { color: var(--muted); border-style: dashed; }
+.m-tsec.k-done i { background: var(--s-done); }
+.m-titem { position: absolute; display: flex; align-items: stretch; gap: 0; border-radius: 6px; border: 1px solid var(--line-2); background: var(--bg); overflow: hidden; }
+.m-titem.late { border-color: color-mix(in srgb, var(--danger) 50%, var(--line-2)); }
+.m-titem.done { opacity: .62; }
+.m-titem.busy { opacity: .45; pointer-events: none; }
+.mti-box { flex: none; align-self: center; display: grid; place-items: center; width: 18px; height: 18px; margin: 0 4px 0 10px; border-radius: 5px; border: 1.5px solid var(--line-3); background: transparent; color: var(--bg); cursor: pointer; padding: 0; }
+.mti-box:hover { border-color: var(--s-done); background: var(--s-done-bg); }
+.mti-box.on { border-color: var(--s-done); background: var(--s-done); }
+.mti-box.fixed { cursor: default; }
+.mti-box.dot { border: none; width: 8px; height: 8px; border-radius: 50%; margin: 0 9px 0 15px; background: var(--sig, var(--s-work)); }
+.mti-main { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 10px 0 6px; border: 0; background: transparent; text-align: left; color: var(--text); cursor: pointer; }
+.mti-main:disabled { cursor: default; color: var(--text); opacity: 1; }
+.mti-main:not(:disabled):hover .mti-title { text-decoration: underline; text-underline-offset: 2px; }
+.mti-title { font-size: 12.5px; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+.m-titem.done .mti-title { text-decoration: line-through; color: var(--muted); }
+.mti-who { font-weight: 650; color: var(--text-2); }
+.mti-meta { display: flex; gap: 8px; min-width: 0; font: 500 11px var(--f-mono); color: var(--muted); white-space: nowrap; overflow: hidden; }
+.mti-meta > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mti-src { font-style: normal; flex: none; }
+.mti-src.s-Asana { color: #F0807A; }
+.mti-src.s-슬랙 { color: #C59BFF; }
+.mti-src.s-지시방 { color: var(--s-wait-text); }
+.mti-late { color: var(--danger); }
+/* 일정 카드 = 대화 카드: 누르면 오른쪽 패널(할 일 / 이어진 작업). 고른 카드·작업 중 카드 표시 */
+.m-titem { transition: border-color var(--t1), background var(--t1); }
+.m-titem:hover { border-color: var(--line-3); background: var(--surface); }
+.m-titem.sel { border-color: var(--sig, var(--accent)); box-shadow: 0 0 0 1px var(--sig, var(--accent)) inset; }
+.m-titem.live { border-color: var(--sig); box-shadow: 0 0 12px var(--sig-glow, transparent); }
+.mti-main:hover .mti-title { text-decoration: none; }
+.mti-task { color: var(--sig, var(--accent-text)); flex: none; }
+/* 할 일 패널 */
+.todo-panel { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px; }
+.todo-who { color: var(--text-2); }
+.todo-meta { display: grid; grid-template-columns: 52px 1fr; gap: 6px 10px; margin: 0; font-size: 13px; }
+.todo-meta dt { color: var(--muted); font: 500 12px var(--f-mono); }
+.todo-meta dd { margin: 0; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.todo-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.todo-actions a.btn { text-decoration: none; }
+.todo-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.todo-chips .chip { cursor: pointer; }
+.todo-chips .chip:hover { color: var(--text); border-color: var(--line-3); }
+
+/* 일정 카드: 내 일 아님(스킵) — 올려야 보인다 */
+.mti-skip { flex: none; align-self: center; margin-right: 8px; padding: 2px 7px; border-radius: 4px; border: 1px solid var(--line-2); background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; opacity: 0; transition: opacity var(--t1); }
+.m-titem:hover .mti-skip, .mti-skip:focus-visible { opacity: 1; }
+.mti-skip:hover { color: var(--text); border-color: var(--line-3); }

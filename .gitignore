@@ -1,0 +1,56 @@
+# 패키지·빌드
+node_modules/
+app/vendor/
+app/desktop/BrainApp/bin/
+app/desktop/BrainApp/obj/
+app/desktop/BrainApp/publish/
+app/desktop/*.exe
+
+# 이 PC의 상태·기록
+app/logs/
+app/external/
+app/codex-state.json
+app/notify.json
+
+# 내 작업 내용 (보관함 기록·결과물)
+vault/작업/*
+vault/결정/*
+vault/보고서/*
+vault/일지/*
+vault/기억/*
+!vault/기억/카드/
+vault/기억/카드/*
+!vault/**/.gitkeep
+vault/.obsidian/
+부서작업/*
+!부서작업/README.md
+
+# 비밀정보·개인 설정 (예시는 포함)
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+credentials.*.json
+service-account*.json
+serviceAccount*.json
+.npmrc
+.claude/
+.codex/
+
+# 실행·개발 중 생기는 파일
+*.log
+*.tsbuildinfo
+*.bak
+*.brain-bak
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+app/web/.vite/
+coverage/
